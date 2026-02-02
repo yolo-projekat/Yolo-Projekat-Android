@@ -4,7 +4,7 @@
 [![ML Kit](https://img.shields.io/badge/AI-Google_ML_Kit-orange.svg)](https://developers.google.com/ml-kit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**YOLO Vozilo** je moderna Android aplikacija razvijena u Kotlinu (Jetpack Compose) koja služi kao kontrolni centar za pametno vozilo bazirano na mikrokontrolerima (poput ESP32 ili Raspberry Pi). Aplikacija kombinuje daljinsko upravljanje u realnom vremenu sa naprednim AI funkcijama za prepoznavanje objekata i teksta.
+**YOLO Vozilo Android** je moderna Android aplikacija razvijena u Kotlinu (Jetpack Compose) koja služi kao kontrolni centar za pametno vozilo bazirano na mikrokontrolerima (poput ESP32 ili Raspberry Pi). Aplikacija kombinuje daljinsko upravljanje u realnom vremenu sa naprednim AI funkcijama za prepoznavanje objekata i teksta.
 
 
 
