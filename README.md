@@ -85,4 +85,4 @@ Aplikacija koristi čistu, modernu paletu boja:
 
 Autor: Danilo Stoletovic
 
-Licenca: MIT License
+Licenca: MIT
