@@ -80,8 +80,6 @@ Aplikacija koristi čistu, modernu paletu boja:
 🟢 ThemeSuccess (#2ECC71): Indikator aktivnog AI moda.
 
 🔴 ThemeAlert (#E74C3C): Indikator snimanja i diskonekcije.
-
-
 [ ] Kalibracija brzine motora preko UI slajdera.
 
 Autor: [Tvoje Ime/Username] Licenca: MI
