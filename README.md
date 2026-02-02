@@ -62,7 +62,7 @@ Follow Mode: Aplikacija analizira boundingBox detektovanog objekta. Ako je objek
 OCR Auto-Pilot: Ako je aktiviran, aplikacija skenira tekst. Na primer, ako vidi reč "Left", automatski šalje komandu za skretanje ulevo.
 
 📦 Instalacija i Podešavanje
-Klonirajte ovaj repozitorijum.
+Klonirajte ovaj repozitorijum ili preuzmite aplikaciju u release delu.
 
 Otvorite projekat u Android Studiju (Koala ili noviji).
 
@@ -71,7 +71,6 @@ Dodajte neophodne dozvole u AndroidManifest.xml (Internet, Kamera, Storage).
 Povežite svoj telefon na Wi-Fi pristupnu tačku vozila (default IP: 192.168.4.1).
 
 Pokrenite aplikaciju.
-
 🎨 Teme i UI
 Aplikacija koristi čistu, modernu paletu boja:
 
@@ -80,6 +79,6 @@ Aplikacija koristi čistu, modernu paletu boja:
 🟢 ThemeSuccess (#2ECC71): Indikator aktivnog AI moda.
 
 🔴 ThemeAlert (#E74C3C): Indikator snimanja i diskonekcije.
-[ ] Kalibracija brzine motora preko UI slajdera.
 
-Autor: [Tvoje Ime/Username] Licenca: MI
+Autor: Danilo Stoletovic
+Licenca: MIT
