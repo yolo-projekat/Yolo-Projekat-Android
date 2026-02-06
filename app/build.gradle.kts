@@ -4,8 +4,6 @@ plugins {
 }
 
 android {
-    // This defines your package for code generation.
-    // It must match your MainActivity package.
     namespace = "com.yolo.vozilo"
     compileSdk = 36
 
@@ -18,9 +16,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // --- ADDED SIGNING CONFIG ---
+    signingConfigs {
+        create("release") {
+            // Checks for local file in project root, otherwise looks for GitHub Runner file
+            val localKey = rootProject.file("keystore/android-key")
+            val githubKey = rootProject.file("release.keystore")
+
+            storeFile = if (localKey.exists()) localKey else githubKey
+
+            // Injected via environment variables in GitHub Actions or your local gradle.properties
+            storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            // --- ATTACH THE SIGNING CONFIG ---
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -32,7 +48,6 @@ android {
 
     buildFeatures { compose = true }
 
-    // CRITICAL: Prevents TFLite models from being corrupted during the build process
     @Suppress("UnstableApiUsage")
     androidResources {
         noCompress += "tflite"
@@ -53,16 +68,10 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
 
-    // AI & Vision (FIXED VERSION)
-    // Using task-vision resolves the "Namespace used in multiple modules" error
-    //implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
-    //implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-    //implementation("com.google.mlkit:text-recognition:16.0.1")
-
+    // AI & Vision
     implementation("com.google.mlkit:object-detection:17.0.0")
     implementation("com.google.mlkit:object-detection-custom:17.0.0")
 
-    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
