@@ -1,20 +1,31 @@
-name: Build Signed Android
-on: [push]
+name: Build & Release Android
+
+on:
+  push:
+    branches: [ "master", "main" ]
+    tags:
+      - 'v*' # Triggers on tags like v1.0, v2.1.4, etc.
+  pull_request:
+    branches: [ "master", "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: set up JDK 17
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
+          cache: gradle # Speeds up future builds by caching dependencies
 
-      # Decodes the keystore from your GitHub Secrets
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
       - name: Decode Keystore
         id: decode_keystore
         run: |
@@ -23,14 +34,26 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease
         env:
-          # These env vars match what you use in your build.gradle
           RELEASE_KEYSTORE: release.keystore
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload Signed APK
+      # Upload as Artifact (Always happens on push or tag)
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: signed-apk
+          name: VOZILO-Signed-APK
           path: app/build/outputs/apk/release/*.apk
+
+      # Create GitHub Release (ONLY happens when you push a tag)
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
