@@ -11,8 +11,8 @@ android {
         applicationId = "com.yolo.vozilo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "2.1"
+        versionCode = 6
+        versionName = "2.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -48,7 +48,6 @@ android {
 
     buildFeatures { compose = true }
 
-    @Suppress("UnstableApiUsage")
     androidResources {
         noCompress += "tflite"
     }
@@ -64,13 +63,13 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
 
     // Networking & Images
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("io.coil-kt:coil-compose:2.6.0")
-    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation(libs.okhttp)
+    implementation(libs.coil.compose)
+    implementation(libs.text.recognition)
 
     // AI & Vision
-    implementation("com.google.mlkit:object-detection:17.0.0")
-    implementation("com.google.mlkit:object-detection-custom:17.0.0")
+    implementation(libs.object1.detection)
+    implementation(libs.object1.detection.custom)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
