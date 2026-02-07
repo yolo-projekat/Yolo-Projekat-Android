@@ -1,88 +1,78 @@
-# 🚗 YOLO projekat android
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-blue.svg)](https://kotlinlang.org/)
-[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack_Compose-green.svg)](https://developer.android.com/jetpack/compose)
-[![ML Kit](https://img.shields.io/badge/AI-Google_ML_Kit-orange.svg)](https://developers.google.com/ml-kit)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<div align="center">
 
-**YOLO Vozilo Android** je moderna Android aplikacija razvijena u Kotlinu (Jetpack Compose) koja služi kao kontrolni centar za pametno vozilo bazirano na mikrokontrolerima (poput ESP32 ili Raspberry Pi). Aplikacija kombinuje daljinsko upravljanje u realnom vremenu sa naprednim AI funkcijama za prepoznavanje objekata i teksta.
+# 📱 YOLO Projekat Android
+### *Moderni AI Kontrolni Centar za Autonomna Vozila*
 
-
-
----
-
-## ✨ Ključne Karakteristike
-
-### 📺 Live Stream & AI Monitoring
-* **Live Stream Monitoring:** Prikaz video signala sa kamere vozila u realnom vremenu preko HTTP protokola.
-* **AI Prepoznavanje Objekata (YOLO-style):** Implementacija *Google ML Kit Object Detection* za identifikaciju i praćenje objekata na ekranu.
-* **Smart Follow Mode:** Automatsko praćenje detektovanog objekta (vozilo se okreće i kreće ka objektu na osnovu pozicije u kadru).
-* **OCR & Auto-Pilot:** Prepoznavanje pisanih komandi ("napred", "levo", "back", itd.) direktno sa slike i njihovo automatsko izvršavanje.
-
-### 🎮 Kontrolni Sistem
-* **Dual Control System:**
-    * *Compact D-Pad:* Klasične strelice za precizno kretanje.
-    * *Circular Joystick:* Intuitivni džojstik za fluidno upravljanje.
-* **WebSocket Komunikacija:** Brz prenos komandi kretanja bez latencije.
-
-### 📸 Multimedia & Recording
-* **Snimanje i Slikanje:** Čuvanje fotografija direktno u galeriju telefona.
-* **Nativno MP4 snimanje:** Konvertovanje niza frejmova u video fajl direktno na uređaju pomoću hardverskog kodiranja.
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-38bdf8?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack_Compose-075985?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![ML Kit](https://img.shields.io/badge/AI-Google_ML_Kit-38bdf8?style=for-the-badge&logo=googlecloud&logoColor=white)](https://developers.google.com/ml-kit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-94a3b8?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 ---
 
-## 🛠 Tehnologije
+<p align="center">
+  <b>YOLO Vozilo Android</b> pretvara tvoj mobilni uređaj u napredni terminal za upravljanje. 
+  <br>Razvijena korišćenjem <b>Jetpack Compose</b>-a, aplikacija nudi besprekoran spoj performansi i modernog dizajna.
+</p>
 
-| Segment | Tehnologija |
-| :--- | :--- |
-| **UI Framework** | Jetpack Compose (Moderni deklarativni UI) |
-| **AI/ML Engine** | Google ML Kit (Object Detection & Text Recognition) |
-| **Networking** | OkHttp & WebSockets |
-| **Image Loading** | Coil (Efikasno učitavanje frejmova) |
-| **Video Processing** | MediaCodec & MediaMuxer |
 
----
 
-## 🚀 Kako radi?
+</div>
 
-### 1. Povezivanje
-Aplikacija pokušava da se poveže na vozilo putem dve adrese:
-* **WebSocket:** `ws://192.168.4.1:1606` (za slanje komandi kretanja).
-* **HTTP Stream:** `http://192.168.4.1:1607/capture` (za preuzimanje frejmova kamere).
+## 🚀 Ključni Moduli
 
-### 2. Komande kretanja
-Vozilo prima sledeće string komande preko WebSocketa:
-* `napred`, `nazad`, `levo`, `desno`
-* `rot_levo`, `rot_desno`
-* `stop` (šalje se čim korisnik pusti dugme)
+### 🧠 Vizuelna Inteligencija (AI)
+* **Object Tracking:** Dinamička detekcija objekata u realnom vremenu koristeći optimizovane YOLO-style modele.
+* **Smart Follow Mode:** Inteligentni algoritam koji omogućava vozilu da samostalno prati cilj na osnovu analize frejmova.
+* **OCR Autopilot:** Napredna ekstrakcija teksta za automatsko izvršavanje pisanih komandi sa okruženja.
 
-### 3. AI Logika
-* **Follow Mode:** Aplikacija analizira `boundingBox` detektovanog objekta. Ako je objekat na levoj strani frejma, šalje se komanda `levo`, ako je u centru `napred`, a ako je desno `desno`.
-* **OCR Auto-Pilot:** Ako je aktiviran, aplikacija skenira tekst. Na primer, ako vidi reč "Left", automatski šalje komandu za skretanje ulevo.
+### 🎮 Kontrolni Inženjering
+* **Low-Latency Stream:** Optimizovan HTTP bafer za prikaz videa sa minimalnim kašnjenjem.
+* **Dual-Interface Control:** Biraj između preciznog D-Pad-a za tehničke manevre ili intuitivnog džojstika za fluidnu vožnju.
+* **WebSocket Core:** Asinhrona komunikacija za trenutni odziv motora vozila.
+
+### 📼 Media & Recording
+* **Hardware Acceleration:** Snimanje frejmova direktno u MP4 format koristeći procesorsku snagu uređaja.
+* **Gallery Integration:** Automatsko čuvanje AI detekcija i snimaka za kasniju analizu.
 
 ---
 
-## 📦 Instalacija i Podešavanje
+## 🛠 Tehnološki Stack
 
-1. **Klonirajte repozitorijum:**
-   ```bash
-   git clone [https://github.com/danilo-stoletovic/yolo-vozilo-android.git](https://github.com/danilo-stoletovic/yolo-vozilo-android.git)
-Otvorite projekat: U Android Studiju (verzija Koala ili noviji).
+| Komponenta | Tehnologija | Uloga |
+| :--- | :--- | :--- |
+| **Arhitektura** | MVVM | Čista i testabilna logika |
+| **UI Framework** | Jetpack Compose | Deklarativni "Glass" interfejs |
+| **Networking** | Ktor / OkHttp | Stabilna WebSocket konekcija |
+| **AI Processing** | Google ML Kit | On-device Computer Vision |
+| **Asinhronost** | Kotlin Coroutines | Multithreaded obrada frejmova |
 
-Konfiguracija: Dodajte neophodne dozvole u AndroidManifest.xml (Internet, Kamera, Storage).
+---
 
-Povezivanje: Povežite svoj telefon na Wi-Fi pristupnu tačku vozila (default IP: 192.168.4.1).
+## 🔧 Mrežna Konfiguracija
 
-Pokrenite aplikaciju.
+Aplikacija se oslanja na **YOLO-Server** arhitekturu:
 
-🎨 Teme i UI
-Aplikacija koristi čistu, modernu paletu boja:
+> [!IMPORTANT]
+> Proverite da li je mobilni uređaj povezan na istu lokalnu mrežu kao i Raspberry Pi 5.
 
-🔵 ThemeBlue (#3498DB): Primarna boja kontrola.
+* **Command Channel:** `ws://192.168.4.1:1606` (WebSocket)
+* **Video Channel:** `http://192.168.4.1:1607/capture` (HTTP Stream)
 
-🟢 ThemeSuccess (#2ECC71): Indikator aktivnog AI moda.
+---
 
-🔴 ThemeAlert (#E74C3C): Indikator snimanja i diskonekcije.
+## 🎨 Vizuelni Identitet
 
-Autor: Danilo Stoletovic
+Dizajn aplikacije prati **Glassmorphism** principe u skladu sa web portalom:
+* **Primary:** `#38bdf8` (Electric Blue)
+* **Background:** `#0f172a` (Deep Space Blue)
+* **Effects:** Blur efekti (12dp) na kontrolnim panelima za maksimalnu preglednost.
 
-Licenca: MIT
+---
+
+<div align="center">
+
+**Autor:** Danilo Stoletović • **Mentor:** Dejan Batanjac  
+**ETŠ „Nikola Tesla“ Niš • 2026**
+
+</div>
