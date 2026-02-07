@@ -199,7 +199,7 @@ class MainActivity : ComponentActivity() {
 
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = ThemeBg) {
-                    Column(Modifier.padding(20.dp)) {
+                    Column(Modifier.padding(39.dp)) {
                         HeaderSection(onCapture = {
                             currentFrame?.let {
                                 saveToGallery(it, "PI_CAP_${System.currentTimeMillis()}.jpg", "image/jpeg")
