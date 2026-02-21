@@ -51,6 +51,13 @@ android {
     androidResources {
         noCompress += "tflite"
     }
+
+    // --- 16KB ALIGNMENT FIX ---
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
 }
 
 dependencies {
