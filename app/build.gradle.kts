@@ -74,4 +74,9 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // webrct & udp
+    implementation("io.getstream:stream-webrtc-android:1.2.1")
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    // Ensure OkHttp is up to date
 }

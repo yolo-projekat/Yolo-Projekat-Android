@@ -1,47 +1,34 @@
 package com.yolo.vozilo
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
-import android.graphics.Bitmap
-import android.graphics.Paint
-import android.graphics.drawable.BitmapDrawable
-import android.media.MediaCodec
-import android.media.MediaCodecInfo
-import android.media.MediaFormat
-import android.media.MediaMuxer
-import android.os.Build
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.content.Context
+import android.graphics.*
+import android.media.*
+import android.os.*
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.automirrored.filled.RotateLeft
-import androidx.compose.material.icons.automirrored.filled.RotateRight
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -53,71 +40,61 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.scale
-import coil.ImageLoader
-import coil.request.CachePolicy
-import coil.request.ImageRequest
-import coil.request.SuccessResult
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
+import kotlinx.coroutines.*
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import org.webrtc.*
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import kotlin.math.atan2
+import kotlin.math.min
 import kotlin.math.sqrt
 
-// --- Corrected Top Level Constants and Theme ---
 private val ThemeBlue = Color(0xFF3498DB)
 private val ThemeAlert = Color(0xFFE74C3C)
 private val ThemeSuccess = Color(0xFF2ECC71)
 
 @Composable
-fun VoziloTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
+fun VoziloTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) {
-        darkColorScheme(
-            primary = ThemeBlue,
-            background = Color(0xFF121212),
-            surface = Color(0xFF1E1E1E),
-            onSurface = Color.White
-        )
+        darkColorScheme(primary = ThemeBlue, background = Color(0xFF121212), surface = Color(0xFF1E1E1E), onSurface = Color.White)
     } else {
-        lightColorScheme(
-            primary = ThemeBlue,
-            background = Color(0xFFFDFDFD), // Original ThemeBg
-            surface = Color(0xFFF2F9FF),    // Original ThemeCard
-            onSurface = Color.Black
-        )
+        lightColorScheme(primary = ThemeBlue, background = Color(0xFFFDFDFD), surface = Color(0xFFF2F9FF), onSurface = Color.Black)
     }
-
     MaterialTheme(colorScheme = colorScheme, content = content)
 }
 
 class MainActivity : ComponentActivity() {
-    private val client = OkHttpClient()
-    private var ws: WebSocket? = null
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val httpClient = OkHttpClient()
 
+    // --- UDP Networking ---
+    private var udpSocket: DatagramSocket? = null
+    private var robotAddress: InetAddress? = null
+
+    // --- WebRTC ---
+    private var peerConnectionFactory: PeerConnectionFactory? = null
+    private var peerConnection: PeerConnection? = null
+
+    // --- ML Kit ---
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val objectDetector = ObjectDetection.getClient(
-        ObjectDetectorOptions.Builder()
-            .setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE)
-            .enableClassification()
-            .enableMultipleObjects()
-            .build()
+        ObjectDetectorOptions.Builder().setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE)
+            .enableClassification().enableMultipleObjects().build()
     )
 
+    // --- State ---
     private var connected by mutableStateOf(false)
     private var isCamOn by mutableStateOf(false)
     private var useJoystick by mutableStateOf(false)
@@ -131,24 +108,18 @@ class MainActivity : ComponentActivity() {
 
     private var isRecording by mutableStateOf(false)
     private val recordedFrames = mutableListOf<Bitmap>()
+    private var lastFrameProcessTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        initNetworking()
+
         setContent {
             VoziloTheme {
                 val context = LocalContext.current
-                val scope = rememberCoroutineScope()
                 val currentColorScheme = MaterialTheme.colorScheme
 
-                // WebSocket Connection Loop
-                LaunchedEffect(Unit) {
-                    while (isActive) {
-                        if (!connected) connectWs()
-                        delay(5000)
-                    }
-                }
-
-                // OCR Auto-Pilot Logic [cite: 8-12]
                 LaunchedEffect(ocrResultText, isOcrAutoPilot) {
                     if (isOcrAutoPilot && ocrResultText.isNotBlank()) {
                         val text = ocrResultText.lowercase()
@@ -163,9 +134,9 @@ class MainActivity : ComponentActivity() {
 
                         if (cmd != null) {
                             isOcrAutoPilot = false
-                            send(cmd)
+                            sendUdpCmd(cmd)
                             delay(1500)
-                            send("stop")
+                            sendUdpCmd("stop")
                             delay(500)
                             ocrResultText = ""
                             isOcrAutoPilot = true
@@ -173,7 +144,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Object Following Logic [cite: 13-16]
                 LaunchedEffect(isFollowActive, detectedObjects) {
                     if (isFollowActive && isYoloActive && detectedObjects.isNotEmpty()) {
                         val obj = detectedObjects.first()
@@ -182,60 +152,20 @@ class MainActivity : ComponentActivity() {
                         val normalizedX = centerX.toFloat() / frameWidth
 
                         when {
-                            normalizedX < 0.35f -> send("levo")
-                            normalizedX > 0.65f -> send("desno")
-                            else -> send("napred")
+                            normalizedX < 0.35f -> sendUdpCmd("levo")
+                            normalizedX > 0.65f -> sendUdpCmd("desno")
+                            else -> sendUdpCmd("napred")
                         }
                     } else if (isFollowActive && (detectedObjects.isEmpty() || !isYoloActive)) {
-                        send("stop")
+                        sendUdpCmd("stop")
                     }
                 }
 
-                // Camera Stream Loop [cite: 17-29]
                 LaunchedEffect(isCamOn) {
                     if (isCamOn) {
-                        val loader = ImageLoader(context)
-                        var lastDetectionTime = 0L
-
-                        while (isActive && isCamOn) {
-                            val request = ImageRequest.Builder(context)
-                                .data("http://192.168.4.1:1607/capture?t=${System.currentTimeMillis()}")
-                                .allowHardware(false)
-                                .memoryCachePolicy(CachePolicy.DISABLED)
-                                .diskCachePolicy(CachePolicy.DISABLED)
-                                .build()
-
-                            val result = loader.execute(request)
-                            if (result is SuccessResult) {
-                                val bitmap = (result.drawable as BitmapDrawable).bitmap
-                                currentFrame = bitmap
-
-                                if (isRecording) {
-                                    synchronized(recordedFrames) {
-                                        recordedFrames.add(bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false))
-                                    }
-                                }
-
-                                val inputImage = InputImage.fromBitmap(bitmap, 0)
-
-                                if (isOcrRunning) {
-                                    recognizer.process(inputImage).addOnSuccessListener { visionText ->
-                                        val detected = visionText.text.lines().firstOrNull { it.isNotBlank() } ?: ""
-                                        if (detected != ocrResultText) ocrResultText = detected
-                                    }
-                                }
-
-                                val currentTime = System.currentTimeMillis()
-                                if (isYoloActive && (currentTime - lastDetectionTime > 400)) {
-                                    objectDetector.process(inputImage).addOnSuccessListener { objects ->
-                                        detectedObjects = objects
-                                        lastDetectionTime = currentTime
-                                    }
-                                }
-                            }
-                            delay(60)
-                        }
+                        startWebRTC()
                     } else {
+                        stopWebRTC()
                         currentFrame = null
                         isRecording = false
                         isFollowActive = false
@@ -257,13 +187,9 @@ class MainActivity : ComponentActivity() {
                         Spacer(Modifier.height(16.dp))
 
                         VideoSectionLive(
-                            isOn = isCamOn,
-                            ocrOverlay = ocrResultText,
-                            objects = detectedObjects,
-                            isOcrRunning = isOcrRunning,
-                            isOcrAutoPilot = isOcrAutoPilot,
-                            isFollowActive = isFollowActive,
-                            frame = currentFrame
+                            isOn = isCamOn, ocrOverlay = ocrResultText, objects = detectedObjects,
+                            isOcrRunning = isOcrRunning, isOcrAutoPilot = isOcrAutoPilot,
+                            isFollowActive = isFollowActive, frame = currentFrame
                         )
 
                         AnimatedVisibility(visible = isCamOn, enter = fadeIn() + expandVertically()) {
@@ -301,10 +227,10 @@ class MainActivity : ComponentActivity() {
                                             }
                                         },
                                         modifier = Modifier
-                                            .background(if(isOcrRunning) ThemeSuccess else currentColorScheme.surface, RoundedCornerShape(12.dp))
+                                            .background(if (isOcrRunning) ThemeSuccess else currentColorScheme.surface, RoundedCornerShape(12.dp))
                                             .size(48.dp)
                                     ) {
-                                        Icon(Icons.Default.TextFields, null, tint = if(isOcrRunning) Color.White else ThemeBlue)
+                                        Icon(Icons.Default.TextFields, null, tint = if (isOcrRunning) Color.White else ThemeBlue)
                                     }
                                 }
 
@@ -317,7 +243,7 @@ class MainActivity : ComponentActivity() {
                                             backgroundColor = if (isFollowActive) ThemeSuccess else Color.Gray
                                         ) {
                                             isFollowActive = !isFollowActive
-                                            if (!isFollowActive) send("stop")
+                                            if (!isFollowActive) sendUdpCmd("stop")
                                         }
                                     }
 
@@ -329,7 +255,7 @@ class MainActivity : ComponentActivity() {
                                             backgroundColor = if (isOcrAutoPilot) ThemeSuccess else Color.Gray
                                         ) {
                                             isOcrAutoPilot = !isOcrAutoPilot
-                                            if (!isOcrAutoPilot) send("stop")
+                                            if (!isOcrAutoPilot) sendUdpCmd("stop")
                                         }
                                     }
                                 }
@@ -346,9 +272,9 @@ class MainActivity : ComponentActivity() {
 
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                             if (useJoystick) {
-                                CircularJoystick { send(it) }
+                                CircularJoystick { sendUdpCmd(it) }
                             } else {
-                                CompactDPad(onStart = { send(it) }, onStop = { send("stop") })
+                                CompactDPad(onStart = { sendUdpCmd(it) }, onStop = { sendUdpCmd("stop") })
                             }
                         }
                     }
@@ -357,38 +283,175 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @Composable
-    fun VideoSectionLive(
-        isOn: Boolean,
-        ocrOverlay: String,
-        objects: List<DetectedObject>,
-        isOcrRunning: Boolean,
-        isOcrAutoPilot: Boolean,
-        isFollowActive: Boolean,
-        frame: Bitmap?
-    ) {
-        val textPaint = remember {
-            Paint().apply {
-                textSize = 38f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                setShadowLayer(3f, 2f, 2f, android.graphics.Color.BLACK)
+    private fun initNetworking() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                udpSocket = DatagramSocket()
+                robotAddress = InetAddress.getByName("192.168.4.1")
+            } catch (e: Exception) {
+                Log.e("Networking", "Failed to initialize UDP socket", e)
             }
         }
+    }
 
-        Card(
-            modifier = Modifier.fillMaxWidth().height(220.dp),
-            shape = RoundedCornerShape(20.dp),
-            border = BorderStroke(1.dp, ThemeBlue.copy(0.1f)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
+    private fun sendUdpCmd(cmd: String) {
+        if (robotAddress == null || udpSocket == null) return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val data = cmd.toByteArray()
+                val packet = DatagramPacket(data, data.size, robotAddress, 1606)
+                udpSocket?.send(packet)
+            } catch (e: Exception) {
+                Log.e("UDP", "Send failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun startWebRTC() {
+        PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(this).createInitializationOptions())
+        val options = PeerConnectionFactory.Options()
+        peerConnectionFactory = PeerConnectionFactory.builder().setOptions(options).createPeerConnectionFactory()
+
+        val iceServers = listOf(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer())
+
+        peerConnection = peerConnectionFactory?.createPeerConnection(iceServers, object : CustomPeerConnectionObserver() {
+            override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
+                connected = state == PeerConnection.IceConnectionState.CONNECTED
+            }
+
+            override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {
+                val track = receiver?.track() as? VideoTrack ?: return
+                track.addSink { frame -> processWebRTCFrame(frame) }
+            }
+        })
+
+        peerConnection?.addTransceiver(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO, RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY))
+
+        peerConnection?.createOffer(object : CustomSdpObserver() {
+            override fun onCreateSuccess(desc: SessionDescription?) {
+                desc?.let {
+                    peerConnection?.setLocalDescription(CustomSdpObserver(), it)
+                    postOfferToServer(it)
+                }
+            }
+        }, MediaConstraints())
+    }
+
+    private fun postOfferToServer(sdp: SessionDescription) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val json = JSONObject().apply {
+                    put("sdp", sdp.description)
+                    put("type", sdp.type.canonicalForm())
+                }.toString()
+
+                val body = json.toRequestBody("application/json".toMediaType())
+                val request = Request.Builder().url("http://192.168.4.1:1607/offer").post(body).build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val respJson = JSONObject(response.body?.string() ?: "")
+                        val remoteSdp = SessionDescription(SessionDescription.Type.fromCanonicalForm(respJson.getString("type")), respJson.getString("sdp"))
+                        peerConnection?.setRemoteDescription(CustomSdpObserver(), remoteSdp)
+                    }
+                }
+            } catch (e: Exception) { Log.e("WebRTC", "Signaling failed", e) }
+        }
+    }
+
+    private fun processWebRTCFrame(frame: VideoFrame) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastFrameProcessTime < 66) return
+        lastFrameProcessTime = currentTime
+
+        frame.retain() // Critical: Retain native memory pointer before processing
+
+        val buffer = frame.buffer
+        val i420Buffer = buffer.toI420()
+
+        if (i420Buffer == null) {
+            frame.release() // Clean up if buffer extraction fails
+            return
+        }
+
+        val bitmap = i420ToBitmap(i420Buffer)
+        frame.release() // Release the original frame wrapper
+
+        scope.launch(Dispatchers.Main) {
+            currentFrame = bitmap
+
+            if (isRecording) {
+                synchronized(recordedFrames) { recordedFrames.add(bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)) }
+            }
+
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
+            if (isOcrRunning) {
+                recognizer.process(inputImage).addOnSuccessListener { visionText ->
+                    val detected = visionText.text.lines().firstOrNull { it.isNotBlank() } ?: ""
+                    if (detected != ocrResultText) ocrResultText = detected
+                }
+            }
+
+            if (isYoloActive) {
+                objectDetector.process(inputImage).addOnSuccessListener { objects -> detectedObjects = objects }
+            }
+        }
+    }
+
+    private fun i420ToBitmap(i420: VideoFrame.I420Buffer): Bitmap {
+        val width = i420.width
+        val height = i420.height
+        val yuvBytes = ByteArray(width * height * 3 / 2)
+
+        val yBuffer = i420.dataY
+        val uBuffer = i420.dataU
+        val vBuffer = i420.dataV
+
+        val ySize = yBuffer.remaining()
+        val uSize = uBuffer.remaining()
+        val vSize = vBuffer.remaining()
+
+        yBuffer.get(yuvBytes, 0, ySize)
+
+        var uvIndex = ySize
+        for (i in 0 until min(uSize, vSize)) {
+            yuvBytes[uvIndex++] = vBuffer.get(i)
+            yuvBytes[uvIndex++] = uBuffer.get(i)
+        }
+
+        val yuvImage = YuvImage(yuvBytes, ImageFormat.NV21, width, height, null)
+        val out = ByteArrayOutputStream()
+        yuvImage.compressToJpeg(Rect(0, 0, width, height), 80, out)
+        val imageBytes = out.toByteArray()
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+
+        i420.release() // Release JNI memory for this specific I420 frame
+        return bitmap
+    }
+
+    private fun stopWebRTC() {
+        peerConnection?.close()
+        peerConnection = null
+        connected = false
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopWebRTC()
+        udpSocket?.close()
+        recognizer.close()
+        objectDetector.close()
+        scope.cancel()
+    }
+
+    @Composable
+    fun VideoSectionLive(isOn: Boolean, ocrOverlay: String, objects: List<DetectedObject>, isOcrRunning: Boolean, isOcrAutoPilot: Boolean, isFollowActive: Boolean, frame: Bitmap?) {
+        val textPaint = remember { Paint().apply { textSize = 38f; typeface = Typeface.DEFAULT_BOLD; setShadowLayer(3f, 2f, 2f, android.graphics.Color.BLACK) } }
+
+        Card(modifier = Modifier.fillMaxWidth().height(220.dp), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ThemeBlue.copy(0.1f)), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Box(Modifier.fillMaxSize().background(Color.Black), Alignment.Center) {
                 if (isOn && frame != null) {
-                    Image(
-                        bitmap = frame.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.FillBounds
-                    )
+                    Image(bitmap = frame.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
 
                     Canvas(Modifier.fillMaxSize()) {
                         val scaleX = size.width / frame.width
@@ -397,22 +460,9 @@ class MainActivity : ComponentActivity() {
                         objects.forEach { obj ->
                             val box = obj.boundingBox
                             val rectColor = if(isFollowActive) ThemeSuccess else Color.Yellow
-
-                            drawRect(
-                                color = rectColor,
-                                topLeft = androidx.compose.ui.geometry.Offset(box.left * scaleX, box.top * scaleY),
-                                size = androidx.compose.ui.geometry.Size(box.width() * scaleX, box.height() * scaleY),
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                            )
-
+                            drawRect(color = rectColor, topLeft = Offset(box.left * scaleX, box.top * scaleY), size = Size(box.width() * scaleX, box.height() * scaleY), style = Stroke(width = 2.dp.toPx()))
                             obj.labels.firstOrNull { it.confidence > 0.4f }?.let { label ->
-                                val displayInfo = "${label.text.uppercase()} ${(label.confidence * 100).toInt()}%"
-                                drawContext.canvas.nativeCanvas.drawText(
-                                    displayInfo,
-                                    box.left * scaleX,
-                                    (box.top * scaleY) - 15,
-                                    textPaint.apply { color = rectColor.toArgb() }
-                                )
+                                drawContext.canvas.nativeCanvas.drawText("${label.text.uppercase()} ${(label.confidence * 100).toInt()}%", box.left * scaleX, (box.top * scaleY) - 15, textPaint.apply { color = rectColor.toArgb() })
                             }
                         }
                     }
@@ -423,14 +473,6 @@ class MainActivity : ComponentActivity() {
                                 Icon(Icons.Default.TextFields, null, tint = Color.White, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text(ocrOverlay, color = if(isOcrAutoPilot) ThemeSuccess else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    if (isOcrAutoPilot || isFollowActive) {
-                        Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
-                            Box(Modifier.background(ThemeSuccess, CircleShape).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                Text("AUTO", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -485,18 +527,10 @@ class MainActivity : ComponentActivity() {
         val currentColorScheme = MaterialTheme.colorScheme
         Surface(
             modifier = Modifier.size(size).align(btnAlign).pointerInput(Unit) {
-                detectTapGestures(onPress = {
-                    try { isPressed = true; onStart(cmd); awaitRelease() } finally { isPressed = false; onStop() }
-                })
+                detectTapGestures(onPress = { try { isPressed = true; onStart(cmd); awaitRelease() } finally { isPressed = false; onStop() } })
             },
-            shape = RoundedCornerShape(16.dp),
-            color = if (isPressed) ThemeBlue else currentColorScheme.surface,
-            border = BorderStroke(1.dp, ThemeBlue.copy(0.1f))
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(label, fontSize = 24.sp, color = if (isPressed) Color.White else ThemeBlue)
-            }
-        }
+            shape = RoundedCornerShape(16.dp), color = if (isPressed) ThemeBlue else currentColorScheme.surface, border = BorderStroke(1.dp, ThemeBlue.copy(0.1f))
+        ) { Box(contentAlignment = Alignment.Center) { Text(label, fontSize = 24.sp, color = if (isPressed) Color.White else ThemeBlue) } }
     }
 
     @Composable
@@ -505,18 +539,10 @@ class MainActivity : ComponentActivity() {
         val currentColorScheme = MaterialTheme.colorScheme
         Surface(
             modifier = Modifier.size(56.dp).align(btnAlign).pointerInput(Unit) {
-                detectTapGestures(onPress = {
-                    try { isPressed = true; onStart(cmd); awaitRelease() } finally { isPressed = false; onStop() }
-                })
+                detectTapGestures(onPress = { try { isPressed = true; onStart(cmd); awaitRelease() } finally { isPressed = false; onStop() } })
             },
-            shape = CircleShape,
-            color = if (isPressed) ThemeBlue else currentColorScheme.surface,
-            border = BorderStroke(1.dp, ThemeBlue.copy(0.2f))
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, null, Modifier.size(28.dp), if (isPressed) Color.White else ThemeBlue)
-            }
-        }
+            shape = CircleShape, color = if (isPressed) ThemeBlue else currentColorScheme.surface, border = BorderStroke(1.dp, ThemeBlue.copy(0.2f))
+        ) { Box(contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(28.dp), if (isPressed) Color.White else ThemeBlue) } }
     }
 
     @Composable
@@ -547,8 +573,7 @@ class MainActivity : ComponentActivity() {
                             onCmd(cmd)
                         }
                     }
-                },
-            Alignment.Center
+                }, Alignment.Center
         ) {
             Box(Modifier.offset { IntOffset(offX.toInt(), offY.toInt()) }.size(60.dp).background(ThemeBlue, CircleShape).border(3.dp, Color.White, CircleShape))
         }
@@ -565,7 +590,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun createMp4Natively(context: android.content.Context) {
+    @SuppressLint("MissingPermission")
+    private fun createMp4Natively(context: Context) {
         val frames = synchronized(recordedFrames) { recordedFrames.toList() }
         if (frames.isEmpty()) return
         val width = 640
@@ -605,15 +631,13 @@ class MainActivity : ComponentActivity() {
                         }
                         encoder.releaseOutputBuffer(outIdx, false)
                         dequeued = true
-                    } else if (outIdx == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                        dequeued = true
-                    }
+                    } else if (outIdx == MediaCodec.INFO_TRY_AGAIN_LATER) { dequeued = true }
                 }
             }
             encoder.stop()
             encoder.release()
             if (muxerStarted) { muxer.stop(); muxer.release(); saveVideoToGallery(outputFile) }
-            Handler(Looper.getMainLooper()).post { Toast.makeText(context, "Video Saved to Gallery!", Toast.LENGTH_SHORT).show() }
+            scope.launch(Dispatchers.Main) { Toast.makeText(context, "Video Saved to Gallery!", Toast.LENGTH_SHORT).show() }
         } catch (e: Exception) { Log.e("Media", "Encoding error: ${e.message}") }
     }
 
@@ -636,26 +660,26 @@ class MainActivity : ComponentActivity() {
         val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
         uri?.let { dest -> contentResolver.openOutputStream(dest)?.use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out) } }
     }
+}
 
-    private fun connectWs() {
-        val req = Request.Builder().url("ws://192.168.4.1:1606").build()
-        ws = client.newWebSocket(req, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) { connected = true }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { connected = false }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { connected = false }
-        })
-    }
+// --- Helper Classes for WebRTC Observables ---
+open class CustomPeerConnectionObserver : PeerConnection.Observer {
+    override fun onSignalingChange(state: PeerConnection.SignalingState?) {}
+    override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {}
+    override fun onIceConnectionReceivingChange(receiving: Boolean) {}
+    override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) {}
+    override fun onIceCandidate(candidate: IceCandidate?) {}
+    override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
+    override fun onAddStream(stream: MediaStream?) {}
+    override fun onRemoveStream(stream: MediaStream?) {}
+    override fun onDataChannel(dataChannel: DataChannel?) {}
+    override fun onRenegotiationNeeded() {}
+    override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {}
+}
 
-    private fun send(cmd: String) {
-        if (connected) {
-            try { ws?.send(cmd) } catch (e: Exception) { Log.e("WS", "Send failed: ${e.message}") }
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        ws?.close(1000, "Activity Destroyed")
-        recognizer.close()
-        objectDetector.close()
-    }
+open class CustomSdpObserver : SdpObserver {
+    override fun onCreateSuccess(desc: SessionDescription?) {}
+    override fun onSetSuccess() {}
+    override fun onCreateFailure(error: String?) {}
+    override fun onSetFailure(error: String?) {}
 }

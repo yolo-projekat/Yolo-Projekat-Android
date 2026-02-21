@@ -1,5 +1,5 @@
 [versions]
-agp = "9.0.0" # 9.0.0 is alpha/internal; 8.7.2 is the current stable for most
+agp = "9.0.1" # 9.0.0 is alpha/internal; 8.7.2 is the current stable for most
 kotlin = "2.3.10"
 coreKtx = "1.17.0" # Updated for better compatibility with SDK 35/36
 junit = "4.13.2"
