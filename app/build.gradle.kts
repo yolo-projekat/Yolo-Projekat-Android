@@ -11,8 +11,8 @@ android {
         applicationId = "com.yolo.vozilo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 6
-        versionName = "2.8"
+        versionCode = 7
+        versionName = "3.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
